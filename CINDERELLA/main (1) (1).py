@@ -21,7 +21,7 @@ from subprocess import getstatusoutput
 from pytube import YouTube
 from aiohttp import web
 from urllib.parse import quote, urljoin
-from pyrogram import Client, filters
+from pyrogram import Client, filters,idle
 from pyrogram.types import Message
 from pyrogram.errors import FloodWait
 from pyrogram.errors.exceptions.bad_request_400 import StickerEmojiInvalid
@@ -112,6 +112,7 @@ def pwdlx_video(url: str, output_filename: str):
         "yt-dlp",
         "--newline",
         "--merge-output-format", "mp4",
+        "--fixup", "never",
         "--remux-video", "mp4",
         "--concurrent-fragments", "8",
         "--downloader", "aria2c",
@@ -1141,5 +1142,15 @@ async def txt_handler(bot: Client, m: Message):
 
 
 
+async def run_all():
+    runner = web.AppRunner(await web_server())
+    await runner.setup()
+    await web.TCPSite(runner, "0.0.0.0", int(os.environ.get("PORT", 8080))).start()
+    await bot.start()
+    await idle()
+    await bot.stop()
+
+
 if __name__ == "__main__":
     bot.run()
+    asyncio.get_event_loop().run_until_complete(run_all())
