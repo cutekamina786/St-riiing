@@ -21,7 +21,7 @@ from subprocess import getstatusoutput
 from pytube import YouTube
 from aiohttp import web
 from urllib.parse import quote, urljoin
-from pyrogram import Client, filters
+from pyrogram import Client, filters, idle
 from pyrogram.types import Message
 from pyrogram.errors import FloodWait
 from pyrogram.errors.exceptions.bad_request_400 import StickerEmojiInvalid
@@ -33,35 +33,10 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 logger = logging.getLogger(__name__)
 
-# Initialize the bot
-bot = Client(
-    "bot",
-    api_id=37721193,
-    api_hash="ed5cbbc0e14a777e1b2deb0c3f763874",
-    bot_token="8795042624:AAH5lJRo_E2mjPLc7MDlgbFNGmCww29pa_A"
-)
-
-my_name = "Zx"
-
-cookies_file_path = os.getenv("COOKIES_FILE_PATH", "/modules/youtube_cookies.txt")
-
-# Define aiohttp routes
-routes = web.RouteTableDef()
-
-@routes.get("/", allow_head=True)
-async def root_route_handler(request):
-    return web.json_response("https://text-leech-bot-for-render.onrender.com/")
-
-async def web_server():
-    web_app = web.Application(client_max_size=30000000)
-    web_app.add_routes(routes)
-    return web_app
-
 my_name = "ZX"
 
 cookies_file_path = os.getenv("COOKIES_FILE_PATH", "/modules/youtube_cookies.txt")
 
-# Initialize Bot
 bot = Client(
     "bot",
     api_id=API_ID,
@@ -69,11 +44,9 @@ bot = Client(
     bot_token=BOT_TOKEN
 )
 
-# ---------------- WEB SERVER ----------------
-
 routes = web.RouteTableDef()
 
-@routes.get("/")
+@routes.get("/", allow_head=True)
 async def root(request):
     return web.Response(text="Bot is Running!")
 
@@ -83,35 +56,13 @@ async def web_server():
     return app
 
 
-# ---------------- START BOT ----------------
-
-async def start_bot():
-    await bot.start()
-    me = await bot.get_me()
-    print(f"Bot Started Successfully as @{me.username}")
-
-async def stop_bot():
-    await bot.stop()
-
-async def main():
-    await start_bot()
-
-    try:
-        while True:
-            await asyncio.sleep(3600)
-    finally:
-        await stop_bot()
-
-
-    return output_filename
-    
-
 
 def pwdlx_video(url: str, output_filename: str):
     cmd = [
         "yt-dlp",
         "--newline",
         "--merge-output-format", "mp4",
+        "--fixup", "never",
         "--remux-video", "mp4",
         "--concurrent-fragments", "8",
         "--downloader", "aria2c",
@@ -318,80 +269,6 @@ def get_jw_signed_url(content_id, access_token):
         return None
 
 
-
-def get_jw_signed_url(content_id, access_token):
-
-    headers = {
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "en",
-        "Origin": "https://web.classplusapp.com",
-        "Referer": "https://web.classplusapp.com/",
-        "Region": "IN",
-        "User-Agent": "Mozilla/5.0",
-        "X-Access-Token": access_token,
-    }
-
-    # 1. First try: contentId
-    content_api = (
-        "https://api.classplusapp.com/cams/uploader/video/"
-        f"jw-signed-url?contentId={quote(content_id, safe='')}"
-    )
-
-    print("[1] Trying contentId...")
-
-    r = requests.get(
-        content_api,
-        headers=headers,
-        timeout=15
-    )
-
-    print(f"[CONTENT] Status: {r.status_code}")
-
-    if r.ok:
-        data = r.json()
-        signed_url = data.get("url")
-
-        if signed_url:
-            hostname = (urlparse(signed_url).hostname or "").lower()
-
-            print(f"[CONTENT] Host: {hostname}")
-
-            # Akamai URL → directly use it
-            if hostname == "akamai-cdn.classplusapp.com":
-                print("[+] Akamai signed URL found")
-                return signed_url
-
-    # 2. Fallback: same ID as liveSessionId
-    print("[2] Content URL not Akamai")
-    print("[+] Trying liveSessionId API...")
-
-    live_api = (
-        "https://api.classplusapp.com/cams/uploader/video/"
-        f"jw-signed-url?liveSessionId={quote(content_id, safe='')}"
-        "&isAgora=2"
-    )
-
-    r = requests.get(
-        live_api,
-        headers=headers,
-        timeout=15
-    )
-
-    print(f"[LIVE] Status: {r.status_code}")
-    r.raise_for_status()
-
-    data = r.json()
-    signed_url = data.get("url")
-
-    if not signed_url:
-        print("[!] Live signed URL not found")
-        return None
-
-    print("[+] Live signed URL received")
-
-    return signed_url
-
-
 def new_classplus_cdn(url, raw_text2, output_filename):
     format_selector = (
         f"bestvideo[height<={raw_text2}]"
@@ -403,6 +280,7 @@ def new_classplus_cdn(url, raw_text2, output_filename):
         "--newline",
         "-f", format_selector,
         "--merge-output-format", "mp4",
+        "--fixup", "never",
         "--remux-video", "mp4",
         "--concurrent-fragments", "8",
         "--downloader", "aria2c",
@@ -490,7 +368,7 @@ async def txt_handler(bot: Client, m: Message):
     await input.delete(True)
     file_name, ext = os.path.splitext(os.path.basename(x))
     credit = f"@jaat_mk"
-    token = f"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MzYxNTE3MzAuMTI2LCJkYXRhIjp7Il9pZCI6IjYzMDRjMmY3Yzc5NjBlMDAxODAwNDQ4NyIsInVzZXJuYW1lIjoiNzc2MTAxNzc3MCIsImZpcnN0TmFtZSI6IkplZXYgbmFyYXlhbiIsImxhc3ROYW1lIjoic2FoIiwib3JnYW5pemF0aW9uIjp7Il9pZCI6IjVlYjM5M2VlOTVmYWI3NDY4YTc5ZDE4OSIsIndlYnNpdGUiOiJwaHlzaWNzd2FsbGFoLmNvbSIsIm5hbWUiOiJQaHlzaWNzd2FsbGFoIn0sImVtYWlsIjoiV1dXLkpFRVZOQVJBWUFOU0FIQEdNQUlMLkNPTSIsInJvbGVzIjpbIjViMjdiZDk2NTg0MmY5NTBhNzc4YzZlZiJdLCJjb3VudHJ5R3JvdXAiOiJJTiIsInR5cGUiOiJVU0VSIn0sImlhdCI6MTczNTU0NjkzMH0.iImf90mFu_cI-xINBv4t0jVz-rWK1zeXOIwIFvkrS0M"
+    token = os.getenv("PW_TOKEN", "")
     try:    
         with open(x, "r") as f:
             content = f.read()
@@ -521,7 +399,7 @@ async def txt_handler(bot: Client, m: Message):
     else:
         b_name = raw_text0
 
-        await editable.edit("**Enter resolution.\n Eg : 480 or 720**")
+    await editable.edit("**Enter resolution.\n Eg : 480 or 720**")
     input2: Message = await bot.listen(editable.chat.id)
     raw_text2 = input2.text
     await input2.delete(True)
@@ -583,22 +461,12 @@ async def txt_handler(bot: Client, m: Message):
     else:
         thumb = "no"
 
-    count = int(raw_text)    
+    count = arg    
     try:
         for i in range(arg-1, len(links)):
 
             Vxy = links[i][1].replace("file/d/","uc?export=download&id=").replace("www.youtube-nocookie.com/embed", "youtu.be").replace("?modestbranding=1", "").replace("/view?usp=sharing","")
             url = "https://" + Vxy
-            if "visionias" in url:
-                async with ClientSession() as session:
-                    async with session.get(url, headers={'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9', 'Accept-Language': 'en-US,en;q=0.9', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'Pragma': 'no-cache', 'Referer': 'http://www.visionias.in/', 'Sec-Fetch-Dest': 'iframe', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Site': 'cross-site', 'Upgrade-Insecure-Requests': '1', 'User-Agent': 'Mozilla/5.0 (Linux; Android 12; RMX2121) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Mobile Safari/537.36', 'sec-ch-ua': '"Chromium";v="107", "Not=A?Brand";v="24"', 'sec-ch-ua-mobile': '?1', 'sec-ch-ua-platform': '"Android"',}) as resp:
-                        text = await resp.text()
-                        url = re.search(r"(https://.*?playlist.m3u8.*?)\"", text).group(1)
-
-            if "acecwply" in url:
-                cmd = f'yt-dlp -o "{name}.%(ext)s" -f "bestvideo[height<={raw_text2}]+bestaudio" --hls-prefer-ffmpeg --no-keep-video --remux-video mkv --no-warning "{url}"'
-                
-
             if "visionias" in url:
                 async with ClientSession() as session:
                     async with session.get(url, headers={'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9', 'Accept-Language': 'en-US,en;q=0.9', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'Pragma': 'no-cache', 'Referer': 'http://www.visionias.in/', 'Sec-Fetch-Dest': 'iframe', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Site': 'cross-site', 'Upgrade-Insecure-Requests': '1', 'User-Agent': 'Mozilla/5.0 (Linux; Android 12; RMX2121) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Mobile Safari/537.36', 'sec-ch-ua': '"Chromium";v="107", "Not=A?Brand";v="24"', 'sec-ch-ua-mobile': '?1', 'sec-ch-ua-platform': '"Android"',}) as resp:
@@ -627,7 +495,7 @@ async def txt_handler(bot: Client, m: Message):
                       
             
             if "edge.api.brightcove.com" in url:
-                bcov = 'bcov_auth=eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJpYXQiOjE3MjQyMzg3OTEsImNvbiI6eyJpc0FkbWluIjpmYWxzZSwiYXVzZXIiOiJVMFZ6TkdGU2NuQlZjR3h5TkZwV09FYzBURGxOZHowOSIsImlkIjoiZEUxbmNuZFBNblJqVEROVmFWTlFWbXhRTkhoS2R6MDkiLCJmaXJzdF9uYW1lIjoiYVcxV05ITjVSemR6Vm10ak1WUlBSRkF5ZVNzM1VUMDkiLCJlbWFpbCI6Ik5Ga3hNVWhxUXpRNFJ6VlhiR0ppWTJoUk0wMVdNR0pVTlU5clJXSkRWbXRMTTBSU2FHRnhURTFTUlQwPSIsInBob25lIjoiVUhVMFZrOWFTbmQ1ZVcwd1pqUTViRzVSYVc5aGR6MDkiLCJhdmF0YXIiOiJLM1ZzY1M4elMwcDBRbmxrYms4M1JEbHZla05pVVQwOSIsInJlZmVycmFsX2NvZGUiOiJOalZFYzBkM1IyNTBSM3B3VUZWbVRtbHFRVXAwVVQwOSIsImRldmljZV90eXBlIjoiYW5kcm9pZCIsImRldmljZV92ZXJzaW9uIjoiUShBbmRyb2lkIDEwLjApIiwiZGV2aWNlX21vZGVsIjoiU2Ftc3VuZyBTTS1TOTE4QiIsInJlbW90ZV9hZGRyIjoiNTQuMjI2LjI1NS4xNjMsIDU0LjIyNi4yNTUuMTYzIn19.snDdd-PbaoC42OUhn5SJaEGxq0VzfdzO49WTmYgTx8ra_Lz66GySZykpd2SxIZCnrKR6-R10F5sUSrKATv1CDk9ruj_ltCjEkcRq8mAqAytDcEBp72-W0Z7DtGi8LdnY7Vd9Kpaf499P-y3-godolS_7ixClcYOnWxe2nSVD5C9c5HkyisrHTvf6NFAuQC_FD3TzByldbPVKK0ag1UnHRavX8MtttjshnRhv5gJs5DQWj4Ir_dkMcJ4JaVZO3z8j0OxVLjnmuaRBujT-1pavsr1CCzjTbAcBvdjUfvzEhObWfA1-Vl5Y4bUgRHhl1U-0hne4-5fF0aouyu71Y6W0eg'
+                bcov = "bcov_auth=" + os.getenv("BCOV_AUTH", "")
                 url = url.split("bcov_auth")[0]+bcov
                 
             if "youtu" in url:
@@ -665,13 +533,45 @@ async def txt_handler(bot: Client, m: Message):
                         copy = await bot.send_document(chat_id=m.chat.id,document=ka, caption=cc1)
                         count+=1
                         os.remove(ka)
-                        time.sleep(1)
+                        await asyncio.sleep(1)
                     except FloodWait as e:
                         await m.reply_text(str(e))
-                        time.sleep(e.x)
+                        await asyncio.sleep(e.x)
                         continue
 
 
+                elif ".pdf*" in url:
+                    try:
+                        # URL se key split karein (URL*KEY format check)
+                        enc_key = ""
+                        if "*" in url:
+                            url, enc_key = url.split("*", 1)
+                            url = url.strip()
+                            enc_key = enc_key.strip()
+
+                        # Clean single line call method
+                        downloaded_file = await helper.download_appxpdf(url, name, enc_key)
+
+                        if downloaded_file and os.path.exists(downloaded_file):
+                            copy = await bot.send_document(chat_id=m.chat.id, document=downloaded_file, caption=cc1)
+                            count += 1
+                            os.remove(downloaded_file)
+                        else:
+                            await m.reply_text(f"❌ **Decryption Failed:**")
+                            count += 1
+                        
+                        await asyncio.sleep(1)
+                        continue
+
+                    except FloodWait as e:
+                        await m.reply_text(str(e))
+                        await asyncio.sleep(e.x)
+                        count += 1
+                        continue
+                    except Exception as e:
+                        await m.reply_text(f"⚠️ **Error** {str(e)}")
+                        count += 1
+                        continue
                 elif ".pdf?" in url or ".pdf?URLPrefix=" in url:
                     try:
                         await asyncio.sleep(2)
@@ -722,54 +622,22 @@ async def txt_handler(bot: Client, m: Message):
 
                     except FloodWait as e:
                         await m.reply_text(str(e))
-                        time.sleep(e.x)
+                        await asyncio.sleep(e.x)
                         continue
 
                 elif ".pdf" in url:
                     try:
                         cmd = f'yt-dlp -o "{name}.pdf" "{url}"'
                         download_cmd = f"{cmd} -R 25 --fragment-retries 25"
-                        os.system(download_cmd)
+                        await asyncio.get_event_loop().run_in_executor(None, os.system, download_cmd)
                         copy = await bot.send_document(chat_id=m.chat.id, document=f'{name}.pdf', caption=cc1)
                         count += 1
                         os.remove(f'{name}.pdf')
                     except FloodWait as e:
                         await m.reply_text(str(e))
-                        time.sleep(e.x)
-                        continue
-                        
-                elif ".pdf*" in url:
-                    try:
-                        # URL se key split karein (URL*KEY format check)
-                        enc_key = ""
-                        if "*" in url:
-                            url, enc_key = url.split("*", 1)
-                            url = url.strip()
-                            enc_key = enc_key.strip()
-
-                        # Clean single line call method
-                        downloaded_file = await helper.download_appxpdf(url, name, enc_key)
-
-                        if downloaded_file and os.path.exists(downloaded_file):
-                            copy = await bot.send_document(chat_id=m.chat.id, document=downloaded_file, caption=cc1)
-                            count += 1
-                            os.remove(downloaded_file)
-                        else:
-                            await m.reply_text(f"❌ **Decryption Failed:**")
-                            count += 1
-                        
-                        time.sleep(1)
-                        continue
-
-                    except FloodWait as e:
-                        await m.reply_text(str(e))
                         await asyncio.sleep(e.x)
-                        count += 1
                         continue
-                    except Exception as e:
-                        await m.reply_text(f"⚠️ **Error** {str(e)}")
-                        count += 1
-                        continue
+                        
                         
                 
                     
@@ -781,7 +649,7 @@ async def txt_handler(bot: Client, m: Message):
                     await prog.delete(True)
                     await helper.send_vid(bot, m, cc, filename, thumb, name, prog)
                     count += 1
-                    time.sleep(1)
+                    await asyncio.sleep(1)
                     continue
 
 
@@ -789,12 +657,12 @@ async def txt_handler(bot: Client, m: Message):
                     Show = f"<pre><code>Class Plus</code></pre>\n\n🚀❊━━━⟱ 🚀𝐃𝐨𝐰𝐧𝐥𝐨𝐚𝐝𝐢𝐧𝐠🚀 ⟱━━━❊\n\n 📄 𝐓𝐢𝐭𝐥𝐞 » `{name}\n\n`⌨ 𝐐𝐮𝐚𝐥𝐢𝐭𝐲 » {raw_text2} \n **Url »** ᴜʀʟ ᴅᴇᴋʜ ᴋᴀʀ ᴋʏᴀ ᴋᴀʀᴏɢᴇ  \n🤗😎 𝐂𝐨𝐧𝐭𝐚𝐜𝐭 𝐌𝐲 𝐁𝐨𝐬𝐬 » @HeySumit \n\n<code><pre>━━━━━━━✦𝗭𝗫✦━━━━━━━</pre></code>"
                     prog = await m.reply_text(Show)
                     output_filename = f"{name}.mp4"
-                    res_file = new_classplus_cdn(url, raw_text2, output_filename)
+                    res_file = await asyncio.get_event_loop().run_in_executor(None, new_classplus_cdn, url, raw_text2, output_filename)
                     filename = output_filename
                     if WM != "/d":
                         wm_file = f"wm_{filename}"
 
-                        os.system(
+                        await asyncio.get_event_loop().run_in_executor(None, os.system, 
                             f'''ffmpeg -y -i "{filename}" -vf "drawtext=text='{WM}':fontcolor=white:fontsize=30:borderw=2:bordercolor=black:x=mod(t*120\\,(w-text_w)):y=mod(t*70\\,(h-text_h))" -codec:a copy "{wm_file}"'''
                         )
 
@@ -807,7 +675,7 @@ async def txt_handler(bot: Client, m: Message):
                     await prog.delete(True)
                     await helper.send_vid(bot, m, cc, filename, thumb, name, prog)
                     count += 1
-                    time.sleep(1)
+                    await asyncio.sleep(1)
                     continue
 
                 elif '/master.mpd' in url or "code.run" in url or "/dash/" in url or ".mp4?" in url or "?Signature=" in url or "d1d34p8vz63oiq.cloudfront.net" in url or "parentId=" in url or "childId=" in url:
@@ -823,12 +691,12 @@ async def txt_handler(bot: Client, m: Message):
 """
                     prog = await m.reply_text(Show)
                     output_filename = f"{name}.mp4"
-                    res_file = pwdlx_video(url, output_filename)
+                    res_file = await asyncio.get_event_loop().run_in_executor(None, pwdlx_video, url, output_filename)
                     filename = output_filename
                     if WM != "/d":
                         wm_file = f"wm_{filename}"
 
-                        os.system(
+                        await asyncio.get_event_loop().run_in_executor(None, os.system, 
                             f'''ffmpeg -y -i "{filename}" -vf "drawtext=text='{WM}':fontcolor=white:fontsize=30:borderw=2:bordercolor=black:x=mod(t*120\\,(w-text_w)):y=mod(t*70\\,(h-text_h))" -codec:a copy "{wm_file}"'''
                         )
 
@@ -841,7 +709,7 @@ async def txt_handler(bot: Client, m: Message):
                     await prog.delete(True)
                     await helper.send_vid(bot, m, cc, filename, thumb, name, prog)
                     count += 1
-                    time.sleep(1)
+                    await asyncio.sleep(1)
                     continue
                     
                 else:
@@ -854,7 +722,7 @@ async def txt_handler(bot: Client, m: Message):
                     if WM != "/d":
                         wm_file = f"wm_{filename}"
 
-                        os.system(
+                        await asyncio.get_event_loop().run_in_executor(None, os.system, 
                             f'''ffmpeg -y -i "{filename}" -vf "drawtext=text='{WM}':fontcolor=white:fontsize=30:borderw=2:bordercolor=black:x=mod(t*120\\,(w-text_w)):y=mod(t*70\\,(h-text_h))" -codec:a copy "{wm_file}"'''
                         )
 
@@ -867,15 +735,16 @@ async def txt_handler(bot: Client, m: Message):
                     await prog.delete(True)
                     await helper.send_vid(bot, m, cc, filename, thumb, name, prog)
                     count += 1
-                    time.sleep(1)
+                    await asyncio.sleep(1)
             except Exception as e:
+                print(repr(e), flush=True)
                 await m.reply_text(
                     f"⌘ 𝐃𝐨𝐰𝐧𝐥𝐨𝐚𝐝𝐢𝐧𝐠 𝐈𝐧𝐭𝐞𝐫𝐮𝐩𝐭𝐞𝐝\n\n⌘ 𝐍𝐚𝐦𝐞 » {name}\n⌘ 𝐋𝐢𝐧𝐤 » `{url}`"
                 )
                 continue
 
     except Exception as e:
-        await m.reply_text(e)
+        await m.reply_text(str(e))
 
     await m.reply_text("𝐄𝐕𝐄𝐑𝐘𝐓𝐇𝐈𝐍𝐆 𝐈𝐒 𝐃𝐎𝐍𝐄 ☑️ ")
 # Advance
@@ -888,7 +757,7 @@ async def txt_handler(bot: Client, m: Message):
     await input.delete(True)
     file_name, ext = os.path.splitext(os.path.basename(x))
     credit = f"@jaat_mk"
-    token = f"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MzYxNTE3MzAuMTI2LCJkYXRhIjp7Il9pZCI6IjYzMDRjMmY3Yzc5NjBlMDAxODAwNDQ4NyIsInVzZXJuYW1lIjoiNzc2MTAxNzc3MCIsImZpcnN0TmFtZSI6IkplZXYgbmFyYXlhbiIsImxhc3ROYW1lIjoic2FoIiwib3JnYW5pemF0aW9uIjp7Il9pZCI6IjVlYjM5M2VlOTVmYWI3NDY4YTc5ZDE4OSIsIndlYnNpdGUiOiJwaHlzaWNzd2FsbGFoLmNvbSIsIm5hbWUiOiJQaHlzaWNzd2FsbGFoIn0sImVtYWlsIjoiV1dXLkpFRVZOQVJBWUFOU0FIQEdNQUlMLkNPTSIsInJvbGVzIjpbIjViMjdiZDk2NTg0MmY5NTBhNzc4YzZlZiJdLCJjb3VudHJ5R3JvdXAiOiJJTiIsInR5cGUiOiJVU0VSIn0sImlhdCI6MTczNTU0NjkzMH0.iImf90mFu_cI-xINBv4t0jVz-rWK1zeXOIwIFvkrS0M"
+    token = os.getenv("PW_TOKEN", "")
     try:    
         with open(x, "r") as f:
             content = f.read()
@@ -919,7 +788,7 @@ async def txt_handler(bot: Client, m: Message):
     else:
         b_name = raw_text0
 
-        await editable.edit("**Enter resolution.\n Eg : 480 or 720**")
+    await editable.edit("**Enter resolution.\n Eg : 480 or 720**")
     input2: Message = await bot.listen(editable.chat.id)
     raw_text2 = input2.text
     await input2.delete(True)
@@ -975,24 +844,14 @@ async def txt_handler(bot: Client, m: Message):
         getstatusoutput(f"wget '{thumb}' -O 'thumb.jpg'")
         thumb = "thumb.jpg"
     else:
-        thumb == "no"
+        thumb = "no"
 
-    count =int(raw_text)    
+    count = arg    
     try:
         for i in range(arg-1, len(links)):
 
             Vxy = links[i][1].replace("file/d/","uc?export=download&id=").replace("www.youtube-nocookie.com/embed", "youtu.be").replace("?modestbranding=1", "").replace("/view?usp=sharing","")
             url = "https://" + Vxy
-            if "visionias" in url:
-                async with ClientSession() as session:
-                    async with session.get(url, headers={'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9', 'Accept-Language': 'en-US,en;q=0.9', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'Pragma': 'no-cache', 'Referer': 'http://www.visionias.in/', 'Sec-Fetch-Dest': 'iframe', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Site': 'cross-site', 'Upgrade-Insecure-Requests': '1', 'User-Agent': 'Mozilla/5.0 (Linux; Android 12; RMX2121) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Mobile Safari/537.36', 'sec-ch-ua': '"Chromium";v="107", "Not=A?Brand";v="24"', 'sec-ch-ua-mobile': '?1', 'sec-ch-ua-platform': '"Android"',}) as resp:
-                        text = await resp.text()
-                        url = re.search(r"(https://.*?playlist.m3u8.*?)\"", text).group(1)
-
-            if "acecwply" in url:
-                cmd = f'yt-dlp -o "{name}.%(ext)s" -f "bestvideo[height<={raw_text2}]+bestaudio" --hls-prefer-ffmpeg --no-keep-video --remux-video mkv --no-warning "{url}"'
-                
-
             if "visionias" in url:
                 async with ClientSession() as session:
                     async with session.get(url, headers={'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9', 'Accept-Language': 'en-US,en;q=0.9', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'Pragma': 'no-cache', 'Referer': 'http://www.visionias.in/', 'Sec-Fetch-Dest': 'iframe', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Site': 'cross-site', 'Upgrade-Insecure-Requests': '1', 'User-Agent': 'Mozilla/5.0 (Linux; Android 12; RMX2121) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Mobile Safari/537.36', 'sec-ch-ua': '"Chromium";v="107", "Not=A?Brand";v="24"', 'sec-ch-ua-mobile': '?1', 'sec-ch-ua-platform': '"Android"',}) as resp:
@@ -1015,7 +874,7 @@ async def txt_handler(bot: Client, m: Message):
           
 
             if "edge.api.brightcove.com" in url:
-                bcov = 'bcov_auth=eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJpYXQiOjE3MjQyMzg3OTEsImNvbiI6eyJpc0FkbWluIjpmYWxzZSwiYXVzZXIiOiJVMFZ6TkdGU2NuQlZjR3h5TkZwV09FYzBURGxOZHowOSIsImlkIjoiZEUxbmNuZFBNblJqVEROVmFWTlFWbXhRTkhoS2R6MDkiLCJmaXJzdF9uYW1lIjoiYVcxV05ITjVSemR6Vm10ak1WUlBSRkF5ZVNzM1VUMDkiLCJlbWFpbCI6Ik5Ga3hNVWhxUXpRNFJ6VlhiR0ppWTJoUk0wMVdNR0pVTlU5clJXSkRWbXRMTTBSU2FHRnhURTFTUlQwPSIsInBob25lIjoiVUhVMFZrOWFTbmQ1ZVcwd1pqUTViRzVSYVc5aGR6MDkiLCJhdmF0YXIiOiJLM1ZzY1M4elMwcDBRbmxrYms4M1JEbHZla05pVVQwOSIsInJlZmVycmFsX2NvZGUiOiJOalZFYzBkM1IyNTBSM3B3VUZWbVRtbHFRVXAwVVQwOSIsImRldmljZV90eXBlIjoiYW5kcm9pZCIsImRldmljZV92ZXJzaW9uIjoiUShBbmRyb2lkIDEwLjApIiwiZGV2aWNlX21vZGVsIjoiU2Ftc3VuZyBTTS1TOTE4QiIsInJlbW90ZV9hZGRyIjoiNTQuMjI2LjI1NS4xNjMsIDU0LjIyNi4yNTUuMTYzIn19.snDdd-PbaoC42OUhn5SJaEGxq0VzfdzO49WTmYgTx8ra_Lz66GySZykpd2SxIZCnrKR6-R10F5sUSrKATv1CDk9ruj_ltCjEkcRq8mAqAytDcEBp72-W0Z7DtGi8LdnY7Vd9Kpaf499P-y3-godolS_7ixClcYOnWxe2nSVD5C9c5HkyisrHTvf6NFAuQC_FD3TzByldbPVKK0ag1UnHRavX8MtttjshnRhv5gJs5DQWj4Ir_dkMcJ4JaVZO3z8j0OxVLjnmuaRBujT-1pavsr1CCzjTbAcBvdjUfvzEhObWfA1-Vl5Y4bUgRHhl1U-0hne4-5fF0aouyu71Y6W0eg'
+                bcov = "bcov_auth=" + os.getenv("BCOV_AUTH", "")
                 url = url.split("bcov_auth")[0]+bcov
                 
             if "youtu" in url:
@@ -1044,10 +903,10 @@ async def txt_handler(bot: Client, m: Message):
                         copy = await bot.send_document(chat_id=m.chat.id,document=ka, caption=cc1)
                         count+=1
                         os.remove(ka)
-                        time.sleep(1)
+                        await asyncio.sleep(1)
                     except FloodWait as e:
                         await m.reply_text(str(e))
-                        time.sleep(e.x)
+                        await asyncio.sleep(e.x)
                         continue
 
                 elif ".pdf" in url:
@@ -1080,32 +939,32 @@ async def txt_handler(bot: Client, m: Message):
 
                     except FloodWait as e:
                         await m.reply_text(str(e))
-                        time.sleep(e.x)
+                        await asyncio.sleep(e.x)
                         continue
 
                 elif ".pdf" in url:
                     try:
                         cmd = f'yt-dlp -o "{name}.pdf" "{url}"'
                         download_cmd = f"{cmd} -R 25 --fragment-retries 25"
-                        os.system(download_cmd)
+                        await asyncio.get_event_loop().run_in_executor(None, os.system, download_cmd)
                         copy = await bot.send_document(chat_id=m.chat.id, document=f'{name}.pdf', caption=cc1)
                         count += 1
                         os.remove(f'{name}.pdf')
                     except FloodWait as e:
                         await m.reply_text(str(e))
-                        time.sleep(e.x)
+                        await asyncio.sleep(e.x)
                         continue                       
 
                 elif 'akamai-cdn.classplusapp.com' in url:
                     Show = f"<pre><code>Class Plus</code></pre>\n\n🚀❊━━━⟱ 🚀𝐃𝐨𝐰𝐧𝐥𝐨𝐚𝐝𝐢𝐧𝐠🚀 ⟱━━━❊\n\n 📄 𝐓𝐢𝐭𝐥𝐞 » `{name}\n\n`⌨ 𝐐𝐮𝐚𝐥𝐢𝐭𝐲 » {raw_text2} \n **Url »** ᴜʀʟ ᴅᴇᴋʜ ᴋᴀʀ ᴋʏᴀ ᴋᴀʀᴏɢᴇ  \n🤗😎 𝐂𝐨𝐧𝐭𝐚𝐜𝐭 𝐌𝐲 𝐁𝐨𝐬𝐬 » @jaat_mk \n\n<code><pre>━━━━━━━✦जाटⁱˢß𝐚𝐜𝐤ツ✦━━━━━━━</pre></code>"
                     prog = await m.reply_text(Show)
                     output_filename = f"{name}.mp4"
-                    res_file = new_classplus_cdn(url, raw_text2, output_filename)
+                    res_file = await asyncio.get_event_loop().run_in_executor(None, new_classplus_cdn, url, raw_text2, output_filename)
                     filename = output_filename
                     await prog.delete(True)
                     await helper.send_vid(bot, m, cc, filename, thumb, name, prog)
                     count += 1
-                    time.sleep(1)
+                    await asyncio.sleep(1)
                     continue
 
                 
@@ -1126,20 +985,30 @@ async def txt_handler(bot: Client, m: Message):
                     await prog.delete(True)
                     await helper.send_vid(bot, m, cc, filename, thumb, name, prog)
                     count += 1
-                    time.sleep(1)
+                    await asyncio.sleep(1)
 
             except Exception as e:
+                print(repr(e), flush=True)
                 await m.reply_text(
                     f"⌘ 𝐃𝐨𝐰𝐧𝐥𝐨𝐚𝐝𝐢𝐧𝐠 𝐈𝐧𝐭𝐞𝐫𝐮𝐩𝐭𝐞𝐝\n\n⌘ 𝐍𝐚𝐦𝐞 » {name}\n⌘ 𝐋𝐢𝐧𝐤 » `{url}`"
                 )
                 continue
 
     except Exception as e:
-        await m.reply_text(e)
+        await m.reply_text(str(e))
     await m.reply_text("𝐀𝐋𝐋 𝐃𝐎𝐍𝐄 ✅ 𝐓𝐈𝐋𝐋 𝐍𝐎𝐖 ")
 
 
 
 
+async def run_all():
+    runner = web.AppRunner(await web_server())
+    await runner.setup()
+    await web.TCPSite(runner, "0.0.0.0", int(os.environ.get("PORT", 8080))).start()
+    await bot.start()
+    await idle()
+    await bot.stop()
+
+
 if __name__ == "__main__":
-    bot.run()
+    asyncio.get_event_loop().run_until_complete(run_all())

@@ -1,4 +1,6 @@
 import os
+import re
+import shutil
 import time
 import datetime
 import aiohttp
@@ -20,13 +22,18 @@ from yt_dlp import YoutubeDL
 import yt_dlp as youtube_dl
 
 
+failed_counter = 0
+
 def duration(filename):
-    result = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
-                             "format=duration", "-of",
-                             "default=noprint_wrappers=1:nokey=1", filename],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT)
-    return float(result.stdout)
+    try:
+        result = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
+                                 "format=duration", "-of",
+                                 "default=noprint_wrappers=1:nokey=1", filename],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+        return float(result.stdout.decode().strip())
+    except Exception:
+        return 0
 
 def exec(cmd):
         process = subprocess.run(cmd, stdout=subprocess.PIPE,stderr=subprocess.PIPE)
@@ -409,55 +416,16 @@ async def download_secure_video(url, name):
 
 
 async def download_video(url, cmd, name):
-    download_cmd = f'{cmd} -R 25 --fragment-retries 25 --external-downloader aria2c --downloader-args "aria2c: -x 16 -j 32"'
     global failed_counter
+    ext_dl = ' --external-downloader aria2c --downloader-args "aria2c: -x 16 -j 32"' if shutil.which("aria2c") else ""
+    download_cmd = f'{cmd} --fixup never -R 25 --fragment-retries 25{ext_dl}'
     print(download_cmd)
     logging.info(download_cmd)
-    k = subprocess.run(download_cmd, shell=True)
-
-    # Check if the URL is of type 'visionias' or 'penpencilvod'
-    if "visionias" in cmd:
-        return await download_visionias(url, cmd, name)
-    elif "penpencilvod" in cmd:
-        return await download_penpencilvod(url, cmd, name)
-    else:
-        # Default handling for other types of URLs
-        return await default_download(url, cmd, name)
-
-async def download_visionias(url, cmd, name):
-    global failed_counter
-    # Retry logic for 'visionias' URLs
-    if failed_counter <= 10:
-        failed_counter += 1
-        await asyncio.sleep(5)
-        return await download_video(url, cmd, name)
-    else:
-        # Reset failed_counter if the download succeeds
-        failed_counter = 0
-        return await default_download(url, cmd, name)
-
-async def download_penpencilvod(url, cmd, name):
-    global failed_counter
-    # Retry logic for 'penpencilvod' URLs
-    if failed_counter <= 10:
-        failed_counter += 1
-        await asyncio.sleep(5)
-        return await download_video(url, cmd, name)
-    else:
-        # Reset failed_counter if the download succeeds
-        failed_counter = 0
-        return await default_download(url, cmd, name)
-
-async def download_video(url,cmd, name):
-    download_cmd = f'{cmd} -R 25 --fragment-retries 25 --external-downloader aria2c --downloader-args "aria2c: -x 16 -j 32"'
-    global failed_counter
-    print(download_cmd)
-    logging.info(download_cmd)
-    k = subprocess.run(download_cmd, shell=True)
+    k = await asyncio.get_event_loop().run_in_executor(None, lambda: subprocess.run(download_cmd, shell=True))
     if "visionias" in cmd and k.returncode != 0 and failed_counter <= 10:
         failed_counter += 1
         await asyncio.sleep(5)
-        await download_video(url, cmd, name)
+        return await download_video(url, cmd, name)
     failed_counter = 0
     try:
         if os.path.isfile(name):
@@ -473,8 +441,8 @@ async def download_video(url,cmd, name):
             return f"{name}.mp4.webm"
 
         return name
-    except FileNotFoundError as exc:
-        return os.path.isfile.splitext[0] + "." + "mp4"
+    except FileNotFoundError:
+        return os.path.splitext(name)[0] + ".mp4"
 
 
 async def send_doc(bot: Client, m: Message,cc,ka,cc1,prog,count,name):
@@ -490,18 +458,18 @@ async def send_doc(bot: Client, m: Message,cc,ka,cc1,prog,count,name):
 
 
 async def send_vid(bot: Client, m: Message,cc,filename,thumb,name,prog):
-    subprocess.run(f'ffmpeg -i "{filename}" -ss 00:01:00 -vframes 1 "{filename}.jpg"', shell=True)
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, lambda: subprocess.run(f'ffmpeg -y -i "{filename}" -ss 00:01:00 -vframes 1 "{filename}.jpg"', shell=True))
     await prog.delete (True)
     reply = await m.reply_text(f"**⥣ Uploading ...** » `{name}`")
-    try:
-        if thumb == "no":
-            thumbnail = f"{filename}.jpg"
-        else:
-            thumbnail = thumb
-    except Exception as e:
-        await m.reply_text(str(e))
+    if thumb == "no":
+        thumbnail = f"{filename}.jpg"
+    else:
+        thumbnail = thumb
+    if not os.path.exists(thumbnail):
+        thumbnail = None
 
-    dur = int(duration(filename))
+    dur = int(await loop.run_in_executor(None, duration, filename))
 
     start_time = time.time()
 
@@ -511,5 +479,6 @@ async def send_vid(bot: Client, m: Message,cc,filename,thumb,name,prog):
         await m.reply_document(filename,caption=cc, progress=progress_bar,progress_args=(reply,start_time))
     os.remove(filename)
 
-    os.remove(f"{filename}.jpg")
+    if os.path.exists(f"{filename}.jpg"):
+        os.remove(f"{filename}.jpg")
     await reply.delete (True)
